@@ -1,0 +1,46 @@
+name: AWS CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        env:
+          EXPORT: 1
+        run: yarn build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.HAMITYILMAZBLOG_CICD_AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.HAMITYILMAZBLOG_CICD_AWS_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Sync with S3
+        run: aws s3 sync ./out s3://${{ secrets.HAMITYILMAZBLOG_CICD_AWS_S3_BUCKET }}
+
+      - name: Invalidate CloudFront cache
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.HAMITYILMAZBLOG_CICD_AWS_DISTRIBUTION_ID }} --paths "/*"
