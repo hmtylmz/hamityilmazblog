@@ -1,0 +1,189 @@
+---
+title: 'CloudFront ile SSG Site Deploy Etme Rehberi'
+date: 2025-10-13T23:32:14Z
+lastmod: '2021-02-01'
+tags: ['ssg', 'aws', 'cloudfront', 's3', 'route53', 'iam', 'acm', 'github', 'actions', 'devops', 'next-js']
+draft: false
+summary: 'AWS CloudFront ve S3 kullanarak statik site deploy etme adımları. Route 53, ACM sertifikası, IAM yetkileri, S3 bucket ayarları, ve GitHub Actions ile otomatik dağıtım.'
+layout: PostSimple
+bibliography: references-data.bib
+---
+
+## Genel Bakış
+
+Bu rehber, Static Site Generation (SSG) ile oluşturulmuş bir siteyi AWS CloudFront'a nasıl deploy edeceğinizi anlatmaktadır. CloudFront, bir sunucuya ihtiyaç duymadan siteyi birden fazla lokasyonda dağıtık bir şekilde çalıştırarak performanslı ve hızlı erişim sağlar. Ancak, dağıtımı yaparken dikkat edilmesi gereken noktalar vardır: Dosyaları host ederken .html uzantılarını kaldırmak ve root dosyanın index.html olarak ayarlanması önemlidir.
+
+### Route 53 - Hosted zones
+
+- "Create hosted zone" ile kayıt oluşturun.
+  - "Domain name" alanına "a.com" yazın.
+
+### Domain
+
+- "a.com" alan adını aldığınız sağlayıcıda "Name Server" ayarlarını, Route 53'te oluşturduğunuz Hosted Zone’daki Name Server’lar ile güncelleyin.
+
+### AWS Certificate Manager (ACM)
+
+- "Request" seçeneği ile yeni sertifika talebinde bulunun.
+  - "Domain names" bölümünde "Fully qualified domain name" olarak "a.com" yazın.
+
+### Route 53 - Hosted zones
+
+- "a.com" domainine "Create record" seçeneği ile bir kayıt ekleyin.
+- "Record type" olarak "CNAME" seçin ve "Value" alanına sertifika detaylarında verilen "CNAME value"'yu yazın.
+- Sertifika doğrulandıktan sonra "Status" kısmında "Issued" olarak görünecektir.
+
+### S3 Bucket
+
+- "Create Bucket" seçeneği ile yeni bir "bucket" oluşturun.
+  - "Bucket name" alanına "blog" yazın.
+  - "Block Public Access settings for this bucket" bölümünde "Block all public access" seçimini kaldırın.
+- Bucket oluştuktan sonra "Permissions" sekmesinde aşağıdaki "policy"i ekleyin.
+```json:BucketPolicy
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::blog/*"
+        }
+    ]
+}
+```
+
+### Cloudfront Functions
+
+- "Create function" ile fonksiyon oluşturun.
+  - "Name" alanına "htmlredirect" yazın.
+```js:FunctionCode
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+        if (uri !== '' && uri !== '/' && uri.indexOf('.html') === -1) {
+        request.uri = uri + '.html';
+    }
+    return request;
+} 
+```
+  - "Publish" sekmesine geçin ve "Publish function" seçeneği ile fonksiyonu yayınlayın.
+
+### Cloudfront Distributions
+
+- "Create distribution" ile yeni bir dağıtım oluşturun.
+  - "Origin domain" olarak "blog" S3 bucket'ını seçin.
+  - "Function associations" sekmesinde "Viewer request" bölümünde "Function type" olarak "CloudFront Functions" seçin ve "Function ARN / Name" kısmına "htmlredirect" seçin.
+  - "Settings" sekmesinde "Custom SSL certificate" alanından "a.com" domain sertifikasını seçin.
+  - "Default root object" olarak "index.html" yazın.
+- "Distribution" ı bulun, ARN alanında yazan "Distribution ID" yi ve oluşturan "User ID" yi not edin.
+
+### Route 53 - Hosted zones
+
+- "a.com" domainine Create record seçeneği ile bir kayıt ekleyin.
+  - "Record type" olarak "A" seçin ve "Alias" işaretleyin.
+  - "Choose Endpoint" olarak "Alias from CloudFront distribution" seçin ve dağıtımı seçin.
+
+### Identity and Access Management (IAM) - Policies
+
+- "Create policy" ile yeni policy oluşturun.
+```json:Policy
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::blog",
+                "arn:aws:s3:::blog/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudfront:CreateInvalidation",
+                "cloudfront:GetInvalidation"
+            ],
+            "Resource": "arn:aws:cloudfront::{USER_ID}:distribution/{DISTRIBUTION_ID}"
+        }
+    ]
+}
+```
+   - Policy adı olarak cicdpolicy kullanın.
+
+### Identity and Access Management (IAM) - Users
+
+- "Create user" ile kullanıcı oluşturun.
+  - "User name" i "cicd" yapın.
+  - "Permissions options" bölümünde "cicdpolicy" "policy"sini kullanarak yetki atayın.
+- Ekleme bittikten sonra "cicd" kullanıcısına gidin.
+  - "Security credentials" sekmesinden "Create access key"e girin.
+    - Command Line Interface (CLI) seçin.
+    - "Access ID" ve "Access Key"i not edin.
+  
+### CICD
+
+- Statik Site Uygulaması İndirin: Örneğin, [Next.js Starter Blog](https://github.com/timlrx/tailwind-nextjs-starter-blog) projesini kullanabilirsiniz.
+- Projeye "Github Workflow" ekleyin. 
+```yml:.github/workflows/aws.yml
+name: AWS CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        env:
+          EXPORT: 1
+        run: yarn build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.CICD_AWS_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Sync with S3
+        run: aws s3 sync ./out s3://${{ secrets.CICD_AWS_S3_BUCKET }}
+
+      - name: Invalidate CloudFront cache
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CICD_AWS_DISTRIBUTION_ID }} --paths "/*"
+
+```
+- GitHub Settings sekmesinden Secrets and variables bölümüne gidin ve aşağıdaki değerleri ekleyin:
+    - "CICD_AWS_ACCESS_ID": cicd kullanıcısının "Access ID"si
+    - "CICD_AWS_ACCESS_KEY": cicd kullanıcısının "Access Secret"ı
+    - "CICD_AWS_S3_BUCKET": blog
+    - "CICD_AWS_DISTRIBUTION_ID": CloudFront dağıtım ID'si
+
+Bu adımları tamamladıktan sonra, SSG siteniz otomatik olarak AWS CloudFront üzerinden dağıtılacaktır.
