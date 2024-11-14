@@ -1,0 +1,189 @@
+---
+title: 'Guide to Deploying an SSG Site with CloudFront'
+date: 2025-10-13T23:32:14Z
+lastmod: '2021-02-01'
+tags: ['ssg', 'aws', 'cloudfront', 's3', 'route53', 'iam', 'acm', 'github', 'actions', 'devops', 'next-js']
+draft: false
+summary: 'Steps for deploying a static site using AWS CloudFront and S3. Includes Route 53, ACM certificate, IAM permissions, S3 bucket settings, and GitHub Actions for automated deployment.'
+layout: PostSimple
+bibliography: references-data.bib
+---
+
+## Overview
+
+This guide explains how to deploy a site created with Static Site Generation (SSG) to AWS CloudFront. CloudFront enables efficient, fast access to your site across multiple locations without requiring a dedicated server. However, there are specific steps to consider during deployment: removing .html extensions from files and setting the root file as index.html are crucial.
+
+### Route 53 - Hosted Zones
+
+- Create a new record using "Create hosted zone."
+  - Enter "a.com" in the "Domain name" field.
+
+### Domain
+
+- Update the "Name Server" settings at your domain provider with the Name Servers from the Hosted Zone created in Route 53.
+
+### AWS Certificate Manager (ACM)
+
+- Request a new certificate using the "Request" option.
+  - Enter "a.com" as the "Fully qualified domain name" in the "Domain names" section.
+
+### Route 53 - Hosted Zones
+
+- For the "a.com" domain, add a new record with "Create record."
+- Select "CNAME" as the "Record type" and enter the "CNAME value" from the certificate details in the "Value" field.
+- Once the certificate is verified, its "Status" will display as "Issued."
+
+### S3 Bucket
+
+- Create a new "bucket" using "Create Bucket."
+  - Name it "blog" in the "Bucket name" field.
+  - In the "Block Public Access settings for this bucket" section, uncheck "Block all public access."
+- After creating the bucket, add the following policy in the "Permissions" tab:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::blog/*"
+        }
+    ]
+}
+```
+
+### Cloudfront Functions
+
+- Create a function by selecting "Create function."
+  - Name it "htmlredirect."
+```js:FunctionCode
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+        if (uri !== '' && uri !== '/' && uri.indexOf('.html') === -1) {
+        request.uri = uri + '.html';
+    }
+    return request;
+} 
+```
+  - Go to the "Publish" tab and select "Publish function."
+
+### Cloudfront Distributions
+
+- Create a new distribution using "Create distribution."
+  - Select the "blog" S3 bucket as the "Origin domain."
+  - In the "Function associations" section, choose "Viewer request" as "Function type" and select "htmlredirect" for "Function ARN / Name."
+  - In the "Settings" section, select the "a.com" domain certificate under "Custom SSL certificate."
+  - Set "index.html" as the "Default root object."
+- Note the "Distribution ID" and "User ID" in the ARN section of the distribution.
+
+### Route 53 - Hosted zones
+
+- Add a new record for the "a.com" domain using "Create record."
+  - Select "A" as the "Record type" and mark "Alias."
+  - Under "Choose Endpoint," select "Alias from CloudFront distribution" and choose your distribution.
+
+### Identity and Access Management (IAM) - Policies
+
+- Create a new policy using "Create policy."
+```json:Policy
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::blog",
+                "arn:aws:s3:::blog/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudfront:CreateInvalidation",
+                "cloudfront:GetInvalidation"
+            ],
+            "Resource": "arn:aws:cloudfront::{USER_ID}:distribution/{DISTRIBUTION_ID}"
+        }
+    ]
+}
+```
+   - Name the policy as "cicdpolicy".
+
+### Identity and Access Management (IAM) - Users
+
+- Create a user with "Create user."
+  - Set "User name" as "cicd."
+  - Assign permissions using the "cicdpolicy" created in the previous step.
+- After adding, go to the "cicd" user.
+  - In the "Security credentials" tab, create an access key by selecting "Create access key."
+    - Choose Command Line Interface (CLI).
+    - Note the "Access ID" and "Access Key."
+  
+### CICD
+
+- Download the static site application: For example, you can use the [Next.js Starter Blog](https://github.com/timlrx/tailwind-nextjs-starter-blog) project.
+- Add a "Github Workflow" to the project.
+```yml:.github/workflows/aws.yml
+name: AWS CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        env:
+          EXPORT: 1
+        run: yarn build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.CICD_AWS_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Sync with S3
+        run: aws s3 sync ./out s3://${{ secrets.CICD_AWS_S3_BUCKET }}
+
+      - name: Invalidate CloudFront cache
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CICD_AWS_DISTRIBUTION_ID }} --paths "/*"
+
+```
+- In the GitHub Settings under Secrets and variables, add the following values:
+    - "CICD_AWS_ACCESS_ID": Access ID for the cicd user
+    - "CICD_AWS_ACCESS_KEY": Access Secret for the cicd user
+    - "CICD_AWS_S3_BUCKET": blog
+    - "CICD_AWS_DISTRIBUTION_ID": CloudFront distribution ID
+
+After completing these steps, your SSG site will be automatically deployed through AWS CloudFront.
