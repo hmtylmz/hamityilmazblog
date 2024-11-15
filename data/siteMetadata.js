@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'Hamit YILMAZ',
   author: 'Hamit Y. Blog',
   headerTitle: 'Hamit Y. Blog',
-  description: 'A blog about Stoizm, Financal Freedom, Software Engineer, Whatever I Want',
+  description: 'Exploring Stoicism, Software Engineering, Financial Freedom, and Beyond',
   language: 'en-us',
   theme: 'system', // system, dark or light
   siteUrl: 'https://hamityilmaz.com',
@@ -52,7 +52,7 @@ const siteMetadata = {
   newsletter: {
     // supports mailchimp, buttondown, convertkit, klaviyo, revue, emailoctopus, beehive
     // Please add your .env file and modify it according to your selection
-    provider: 'buttondown',
+    provider: '',
   },
   comments: {
     // If you want to use an analytics provider you have to add it to the
