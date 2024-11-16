@@ -30,6 +30,7 @@ jobs:
       - name: Build project
         env:
           EXPORT: 1
+          UNOPTIMIZED: 1
         run: yarn build
 
       - name: Configure AWS credentials
