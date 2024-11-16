@@ -20,13 +20,13 @@ export default function Footer() {
           <SocialIcon kind="medium" href={siteMetadata.medium} size={6} />
         </div>
         <div className="mb-2 flex space-x-2 text-sm text-gray-500 dark:text-gray-400">
-        <Link href="/">{siteMetadata.title}</Link>
-        <div>{` • `}</div>
+          <Link href="/">{siteMetadata.title}</Link>
+          <div>{` • `}</div>
           <div>2024</div>
         </div>
         <div className="mb-8 text-sm text-gray-500 dark:text-gray-400">
           <Link href="https://github.com/hmtylmz/hamityilmazblog">
-          Check out the source code for this site on GitHub
+            Check out the source code for this site on GitHub
           </Link>
         </div>
       </div>
