@@ -2,7 +2,7 @@
 title: 'Guide to Deploying an SSG Site with CloudFront'
 date: 2025-10-13T23:32:14Z
 lastmod: '2021-02-01'
-tags: ['ssg', 'aws', 'cloudfront', 's3', 'route53', 'iam', 'acm', 'github', 'actions', 'devops', 'next-js']
+tags: ['software engineering', 'devops', 'ssg', 'aws', 'github', 'next-js']
 draft: false
 summary: 'Steps for deploying a static site using AWS CloudFront and S3. Includes Route 53, ACM certificate, IAM permissions, S3 bucket settings, and GitHub Actions for automated deployment.'
 layout: PostSimple
@@ -39,18 +39,19 @@ This guide explains how to deploy a site created with Static Site Generation (SS
   - Name it "blog" in the "Bucket name" field.
   - In the "Block Public Access settings for this bucket" section, uncheck "Block all public access."
 - After creating the bucket, add the following policy in the "Permissions" tab:
+
 ```json
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "PublicReadGetObject",
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::blog/*"
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::blog/*"
+    }
+  ]
 }
 ```
 
@@ -58,6 +59,7 @@ This guide explains how to deploy a site created with Static Site Generation (SS
 
 - Create a function by selecting "Create function."
   - Name it "htmlredirect."
+
 ```js:FunctionCode
 function handler(event) {
     var request = event.request;
@@ -66,9 +68,10 @@ function handler(event) {
         request.uri = uri + '.html';
     }
     return request;
-} 
+}
 ```
-  - Go to the "Publish" tab and select "Publish function."
+
+- Go to the "Publish" tab and select "Publish function."
 
 ### Cloudfront Distributions
 
@@ -88,6 +91,7 @@ function handler(event) {
 ### Identity and Access Management (IAM) - Policies
 
 - Create a new policy using "Create policy."
+
 ```json:Policy
 {
     "Version": "2012-10-17",
@@ -115,7 +119,8 @@ function handler(event) {
     ]
 }
 ```
-   - Name the policy as "cicdpolicy".
+
+- Name the policy as "cicdpolicy".
 
 ### Identity and Access Management (IAM) - Users
 
@@ -126,11 +131,12 @@ function handler(event) {
   - In the "Security credentials" tab, create an access key by selecting "Create access key."
     - Choose Command Line Interface (CLI).
     - Note the "Access ID" and "Access Key."
-  
+
 ### CICD
 
 - Download the static site application: For example, you can use the [Next.js Starter Blog](https://github.com/timlrx/tailwind-nextjs-starter-blog) project.
 - Add a "Github Workflow" to the project.
+
 ```yml:.github/workflows/aws.yml
 name: AWS CI
 
@@ -180,10 +186,11 @@ jobs:
         run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CICD_AWS_DISTRIBUTION_ID }} --paths "/*"
 
 ```
+
 - In the GitHub Settings under Secrets and variables, add the following values:
-    - "CICD_AWS_ACCESS_ID": Access ID for the cicd user
-    - "CICD_AWS_ACCESS_KEY": Access Secret for the cicd user
-    - "CICD_AWS_S3_BUCKET": blog
-    - "CICD_AWS_DISTRIBUTION_ID": CloudFront distribution ID
+  - "CICD_AWS_ACCESS_ID": Access ID for the cicd user
+  - "CICD_AWS_ACCESS_KEY": Access Secret for the cicd user
+  - "CICD_AWS_S3_BUCKET": blog
+  - "CICD_AWS_DISTRIBUTION_ID": CloudFront distribution ID
 
 After completing these steps, your SSG site will be automatically deployed through AWS CloudFront.

@@ -1,8 +1,8 @@
 /** @type {import("pliny/config").PlinyConfig } */
 const siteMetadata = {
   title: 'Hamit YILMAZ',
-  author: 'Hamit Y. Blog',
-  headerTitle: 'Hamit Y. Blog',
+  author: 'H. YILMAZ Blog',
+  headerTitle: 'H. YILMAZ Blog',
   description: 'Exploring Stoicism, Software Engineering, Financial Freedom, and Beyond',
   language: 'en-us',
   theme: 'system', // system, dark or light
@@ -59,7 +59,7 @@ const siteMetadata = {
     // content security policy in the `next.config.js` file.
     // Select a provider and use the environment variables associated to it
     // https://vercel.com/docs/environment-variables
-    provider: 'giscus', // supported providers: giscus, utterances, disqus
+    provider: '', // supported providers: giscus, utterances, disqus
     giscusConfig: {
       // Visit the link below, and follow the steps in the 'configuration' section
       // https://giscus.app/
