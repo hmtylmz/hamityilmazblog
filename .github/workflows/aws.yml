@@ -31,6 +31,7 @@ jobs:
         env:
           EXPORT: 1
           UNOPTIMIZED: 1
+          GOOGLE_ANALYTICS_ID: ${{ secrets.HAMITYILMAZBLOG_GOOGLE_ANALYTICS_ID }}
         run: yarn build
 
       - name: Configure AWS credentials
