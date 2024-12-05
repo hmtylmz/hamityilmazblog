@@ -22,6 +22,7 @@ const siteMetadata = {
   instagram: 'https://www.instagram.com/hamityilm',
   medium: '',
   bluesky: '',
+  goodreads: 'https://www.goodreads.com/user/show/35932418-hamit-yilmaz',
   locale: 'en-US',
   // set to true if you want a navbar fixed to the top
   stickyNav: false,
