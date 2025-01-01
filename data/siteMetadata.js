@@ -9,7 +9,7 @@ const siteMetadata = {
   siteUrl: 'https://hamityilmaz.com',
   siteRepo: 'https://github.com/hmtylmz/hamityilmazblog',
   siteLogo: `${process.env.BASE_PATH || ''}/static/images/logo-test.jpeg`,
-  socialBanner: `${process.env.BASE_PATH || ''}/static/images/twitter-card.png`,
+  socialBanner: `${process.env.BASE_PATH || ''}/static/images/avatar.png`,
   mastodon: '',
   email: 'hamityilmaz@outlook.com',
   github: 'https://github.com/hmtylmz',
