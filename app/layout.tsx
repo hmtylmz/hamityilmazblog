@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     title: siteMetadata.title,
-    card: 'summary_large_image',
+    card: 'summary',
     images: [siteMetadata.socialBanner],
   },
 }
